@@ -40,6 +40,20 @@ def __virtual__():
     return False
 
 
+def _resource_exists(resource,name):
+    '''
+    Wrapper function to check a resource
+    '''
+
+    cmd_ret = __salt__['cmd.run_all']('"{0}" list "{1}" "{2}"'.format(appcmd, resource.lower(), name))
+    if cmd_ret['retcode'] != 0:
+        log.error('can\'t found "{1}" in "{0}"'.format(resource.lower(), name))
+        log.debug(cmd_ret['stderr'])
+        return False
+    else:
+        return True
+
+
 def _resource_list(resource):
     '''
     Wrapper function to the appcmd list x function
@@ -53,7 +67,10 @@ def _resource_list(resource):
         return False
 
     for line in cmd_ret['stdout'].splitlines():
-        ret.append(line.split('"')[1])
+        if resource.lower() in ('wps','request'):
+             ret.append(line)
+        else:
+             ret.append(line.split('"')[1])
     return ret
 
 
@@ -361,6 +378,50 @@ def apppool_set(name, settings):
     return _resource_set('APPPOOL', name, settings)
 
 
+def app_running_list():
+    '''
+    List running worker processes 
+    '''
+    return _resource_list('wps')
+
+
+def apppool_recycle(name):
+    '''
+    Recycle apppool
+    '''
+
+    ret = {}
+    cmd_ret = __salt__['cmd.run_all']('"{0}" recycle apppool /apppool.name:"{1}"'.format(appcmd, name))
+    if cmd_ret['retcode'] != 0:
+        log.error('failed recycling apppool {0}'.format(name))
+        log.debug(cmd_ret['stderr'])
+        return False
+    return True
+
+
+def app_exists(name):
+    '''
+    Check if apppool exists
+    '''
+
+    return _resource_exists('apppools',name)
+
+
+def app_requests(name):
+    '''
+    List currently executing requests on the apppool
+    '''
+
+    ret = []
+    cmd_ret = __salt__['cmd.run_all']('"{0}" list request /apppool.name:"{1}"'.format(appcmd, name))   
+    if cmd_ret['retcode'] != 0:
+        return False
+
+    for line in cmd_ret['stdout'].splitlines():
+        ret.append(line)
+    return ret
+
+
 #############
 ### Sites ###
 #############
@@ -398,6 +459,14 @@ def site_set(name, settings):
     '''
 
     return _resource_set('SITE', name, settings)
+
+
+def site_exists(name):
+    '''
+    Check if site exists
+    '''
+
+    return _resource_exists('site',name)
 
 
 ####################
@@ -478,3 +547,15 @@ def vdir_set(name, settings):
 
     return _resource_set('VDIR', name, settings)
 
+
+###############
+### Request ###
+###############
+
+
+def requests_list():
+    '''
+    List currently executing requests on the server
+    '''
+
+    return _resource_list('request')
